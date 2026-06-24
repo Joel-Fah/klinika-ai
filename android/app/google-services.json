@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "545160429547",
+    "project_id": "klinika-ai",
+    "storage_bucket": "klinika-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:545160429547:android:8b2a9d7af62439b891a3ae",
+        "android_client_info": {
+          "package_name": "dev.buildwithai.yaounde.klinika_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDioUD2GjoWHbx5LdxrjBe_Mj3ddXKkpCg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

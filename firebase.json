@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"klinika-ai","appId":"1:545160429547:android:8b2a9d7af62439b891a3ae","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"klinika-ai","configurations":{"android":"1:545160429547:android:8b2a9d7af62439b891a3ae","ios":"1:545160429547:ios:740ffc65053bd54591a3ae"}}}}}}
