@@ -510,6 +510,38 @@ J'ai eu de la fievre pendant 3 jours, mal a la tete, pas de douleur thoracique, 
 Expected UI: non-interactive `CareSummary` with priority, recommended service,
 summary blocks, next steps, and disclaimer.
 
+## Stress Test Prompts
+
+Use these to test longer, messier patient stories with mixed language, multiple
+symptoms, red flags, and enough ambiguity to force Gemini to choose between
+asking 2-3 focused questions or finalizing with a `CareSummary`.
+
+### 1. Mixed Symptoms, Camfranglais, Possible Urgency
+
+```text
+Depuis hier soir my chest dey pain small-small but parfois e tight comme pression, surtout quand I climb stairs. J'ai aussi un peu de vertige, sueur froide cette nuit, and my left arm felt heavy for like 10 minutes. Je ne sais pas si c'est stress because I had palpitations before, mais aujourd'hui je suis fatigue et j'ai un peu de nausea. No cough, no fever that I know.
+```
+
+Expected behavior:
+
+- urgent or high-priority moderate triage
+- emergency or cardiology-related recommendation
+- 2-3 focused follow-up fields at most if Gemini needs missing details
+- final `CareSummary` with warning signs and urgent next steps
+
+### 2. Pediatric Case, Fever, Rash, Medication Context
+
+```text
+Mon enfant de 4 ans a la fievre depuis 3 jours, rash for body started yesterday, il gratte beaucoup, and today he vomited twice. On lui a donne paracetamol but temperature comes back after some hours. Il boit un peu but less than usual, urine small today, no convulsions, but he looks tired. The rash is mostly on chest and face, not sure if palms/feet. What should we do?
+```
+
+Expected behavior:
+
+- pediatric triage with dehydration/rash awareness
+- symptom chips for fever, rash, vomiting, hydration, tiredness
+- grouped follow-up questions about temperature, rash spread, hydration, and danger signs
+- final `CareSummary` with pediatric next steps and safety disclaimer
+
 ## Troubleshooting
 
 ### The app opens but Gemini does not respond
