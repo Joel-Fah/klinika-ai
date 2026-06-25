@@ -65,7 +65,6 @@ class SessionView extends StatelessWidget {
                     KlinikaSpacing.lg,
                   ),
                   itemCount: controller.surfaceIds.length +
-                      controller.assistantMessages.length +
                       (controller.isLoading.value ? 1 : 0) +
                       (controller.errorMessage.value != null &&
                               !controller.isLoading.value
@@ -74,9 +73,7 @@ class SessionView extends StatelessWidget {
                   separatorBuilder: (_, __) => const Gap(KlinikaSpacing.md),
                   itemBuilder: (context, index) {
                     if (controller.isLoading.value &&
-                        index ==
-                            controller.surfaceIds.length +
-                                controller.assistantMessages.length) {
+                        index == controller.surfaceIds.length) {
                       return const _GeminiThinkingCard()
                           .animate()
                           .fadeIn(duration: 300.ms);
@@ -84,22 +81,11 @@ class SessionView extends StatelessWidget {
 
                     if (controller.errorMessage.value != null &&
                         !controller.isLoading.value &&
-                        index ==
-                            controller.surfaceIds.length +
-                                controller.assistantMessages.length) {
+                        index == controller.surfaceIds.length) {
                       return _ErrorFeedbackCard(
                         message: controller.errorMessage.value!,
                         onDismiss: controller.clearError,
                       ).animate().fadeIn(duration: 240.ms).slideY(begin: 0.08);
-                    }
-
-                    if (index >= controller.surfaceIds.length) {
-                      final message = controller.assistantMessages[
-                          index - controller.surfaceIds.length];
-                      return _AssistantMessageCard(message: message)
-                          .animate()
-                          .fadeIn(duration: 300.ms)
-                          .slideY(begin: 0.08);
                     }
 
                     final id = controller.surfaceIds[index];
@@ -195,61 +181,6 @@ class _GeneratedSurfaceCard extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _AssistantMessageCard extends StatelessWidget {
-  const _AssistantMessageCard({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: ShapeDecoration(
-        color: KlinikaPalette.inkLight,
-        shape: KlinikaShapes.lg.copyWith(
-          side: BorderSide(
-            color: KlinikaPalette.emerald.withValues(alpha: 0.24),
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(KlinikaSpacing.lg),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DecoratedBox(
-              decoration: ShapeDecoration(
-                color: KlinikaPalette.emerald.withValues(alpha: 0.14),
-                shape: KlinikaShapes.md,
-              ),
-              child: const SizedBox(
-                width: 42,
-                height: 42,
-                child: Center(
-                  child: HugeIcon(
-                    icon: HugeIcons.strokeRoundedStethoscope02,
-                    color: KlinikaPalette.emerald,
-                    size: 22,
-                  ),
-                ),
-              ),
-            ),
-            const Gap(KlinikaSpacing.md),
-            Expanded(
-              child: SelectableText(
-                message,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: KlinikaPalette.snowWhite,
-                      height: 1.38,
-                    ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

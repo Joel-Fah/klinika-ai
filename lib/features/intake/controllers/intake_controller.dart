@@ -19,20 +19,20 @@ class IntakeController extends GetxController {
   final chatScrollController = ScrollController();
   final surfaceIds = <String>[].obs;
   final lockedSurfaceIds = <String>[].obs;
-  final assistantMessages = <String>[].obs;
   final isLoading = false.obs;
   final hasStarted = false.obs;
   final shouldHideMainInput = false.obs;
   final errorMessage = RxnString();
   final _history = <Content>[];
   final _surfaceHasInteractiveInput = <String, bool>{};
+  var _surfaceRevision = 0;
 
   GenerativeModel? _model;
 
   static const _clinicalPrompt = '''
 You are a smart, empathetic patient intake assistant for a health facility in Yaounde, Cameroon.
 Patients may speak French, English, Camfranglais, or a mix. Always respond in the same language the patient uses.
-Your job is to guide adaptive patient intake. Use GenUI widgets when interaction helps, and use a clear structured text response when the patient no longer needs another field.
+Your job is to guide adaptive patient intake. Use interactive GenUI widgets when interaction helps, and use non-interactive GenUI summary surfaces when the patient no longer needs another field.
 
 CLINICAL UX RULES:
 1. When a patient describes symptoms, always start by generating a TriageBanner with:
@@ -46,6 +46,8 @@ CLINICAL UX RULES:
 4. Then generate a form with relevant follow-up fields using ClinicalTextInput, ChoicePicker, PainScale, DurationSelector, YesNoCheck, or other core widgets when you need more information.
    Only ask what is clinically relevant to what the patient described.
    Do not ask for information that is already obvious from their description.
+   You may ask 2 or 3 focused questions in the same generated UI if the case needs it.
+   Prefer 2-3 compact fields on one surface over making the user wait for many one-question turns.
 
 5. Every generated form MUST include an obvious submit/continue Button after input fields.
    The button action MUST be an event named "continue_intake".
@@ -57,9 +59,9 @@ CLINICAL UX RULES:
 
 8. Create a new unique surfaceId for every assistant response. Do not reuse earlier surface IDs.
 
-9. Do NOT generate interactive UI on every turn. If the next best step is advice, summary, reassurance, or a final intake handoff, return a structured plain-text response instead.
+9. Do NOT generate interactive input UI on every turn. If the next best step is advice, summary, reassurance, or a final intake handoff, return a non-interactive GenUI surface using CareSummary.
 
-10. After the user has answered enough follow-up questions, finalize warmly. Summarize what you understood, name the recommended service/urgency, give practical next steps, and do not ask for more input.
+10. After the user has answered enough follow-up questions, finalize warmly with CareSummary. Summarize what you understood, name the recommended service/urgency, give practical next steps, and do not ask for more input.
 
 CRITICAL A2UI RULES:
 - These A2UI rules apply ONLY when you decide to render UI.
@@ -76,11 +78,14 @@ CRITICAL A2UI RULES:
 - For symptom duration use DurationSelector.
 - For quick binary clinical checks use YesNoCheck.
 - For free-text answers, prefer ClinicalTextInput because it includes a built-in submit button.
+- For final non-interactive handoff, use CareSummary.
 - TextField values should use explicit data paths like {"path": "/duration_notes"}.
 - TextFields can use onSubmittedAction, but they still need a visible Button after the fields.
 
-PLAIN-TEXT FINAL RESPONSE RULES:
-- Use plain text or Markdown-style bullets, not JSON.
+FINAL RESPONSE RULES:
+- Never finalize with plain Markdown or raw text.
+- Finalize with a new A2UI v0.9 surface containing a CareSummary component.
+- The final CareSummary must be non-interactive: no buttons, no inputs, no action events.
 - Keep it friendly, concise, and actionable.
 - Mention that this is intake guidance, not a diagnosis.
 - For urgent symptoms, clearly recommend urgent care/emergency evaluation.
@@ -156,6 +161,55 @@ EXAMPLE SHAPE:
   }
 }
 ```
+
+FINAL RESPONSE EXAMPLE:
+```json
+{
+  "version": "v0.9",
+  "createSurface": {
+    "surfaceId": "summary_1",
+    "catalogId": "https://a2ui.org/specification/v0_9/basic_catalog.json",
+    "sendDataModel": false
+  }
+}
+```
+
+```json
+{
+  "version": "v0.9",
+  "updateComponents": {
+    "surfaceId": "summary_1",
+    "components": [
+      {
+        "id": "root",
+        "component": "Column",
+        "children": ["summary"]
+      },
+      {
+        "id": "summary",
+        "component": "CareSummary",
+        "severity": "moderate",
+        "title": "Resume de triage",
+        "subtitle": "Les symptomes meritent une consultation sans attendre trop longtemps.",
+        "department": "Medecine generale",
+        "sections": [
+          {
+            "heading": "Ce que j ai compris",
+            "body": "Fievre depuis 3 jours avec maux de tete.",
+            "kind": "summary"
+          },
+          {
+            "heading": "Prochaine etape",
+            "body": "Aller en consultation aujourd hui ou demain pour prise de constantes et examen clinique.",
+            "kind": "nextSteps"
+          }
+        ],
+        "disclaimer": "Cette fiche aide au triage et ne remplace pas un diagnostic medical."
+      }
+    ]
+  }
+}
+```
 ''';
 
   @override
@@ -194,6 +248,7 @@ EXAMPLE SHAPE:
     _conversationSubscription = conversation.events.listen((event) {
       if (event is ConversationSurfaceAdded) {
         errorMessage.value = null;
+        _surfaceRevision++;
         _rememberSurface(event.definition);
         if (!surfaceIds.contains(event.surfaceId)) {
           surfaceIds.add(event.surfaceId);
@@ -202,6 +257,7 @@ EXAMPLE SHAPE:
         _scrollToLatest();
       } else if (event is ConversationComponentsUpdated) {
         errorMessage.value = null;
+        _surfaceRevision++;
         _rememberSurface(event.definition);
         if (!surfaceIds.contains(event.surfaceId)) {
           surfaceIds.add(event.surfaceId);
@@ -209,6 +265,7 @@ EXAMPLE SHAPE:
         _refreshMainInputVisibility();
         _scrollToLatest();
       } else if (event is ConversationSurfaceRemoved) {
+        _surfaceRevision++;
         surfaceIds.remove(event.surfaceId);
         lockedSurfaceIds.remove(event.surfaceId);
         _surfaceHasInteractiveInput.remove(event.surfaceId);
@@ -228,7 +285,7 @@ EXAMPLE SHAPE:
     if (submittedSurfaceId != null) {
       _lockSurface(submittedSurfaceId);
     }
-    final surfaceCountBeforeRequest = surfaceIds.length;
+    final surfaceRevisionBeforeRequest = _surfaceRevision;
     final promptText = _messageToGeminiText(message);
     _history.add(Content.text(promptText));
     _trimHistory();
@@ -253,20 +310,15 @@ EXAMPLE SHAPE:
 
       await Future<void>.delayed(const Duration(milliseconds: 350));
       final readableText = _readableTextFrom(responseText);
-      if (readableText.isNotEmpty) {
-        assistantMessages.add(readableText);
-        hasStarted.value = true;
-        _refreshMainInputVisibility(forceShow: true);
-        _scrollToLatest();
-      }
-
-      if (surfaceIds.length == surfaceCountBeforeRequest) {
-        if (readableText.isEmpty) {
+      if (_surfaceRevision == surfaceRevisionBeforeRequest) {
+        if (readableText.isNotEmpty) {
+          _showError(
+            'Gemini a repondu en texte au lieu d une fiche GenUI finale. Reessayez pour generer une synthese visuelle.',
+          );
+        } else {
           _showError(
             'Gemini a repondu, mais la fiche n etait pas au format A2UI v0.9. Reessayez.',
           );
-        } else {
-          errorMessage.value = null;
         }
       }
     } catch (error) {
@@ -292,7 +344,6 @@ EXAMPLE SHAPE:
     HapticFeedback.selectionClick();
     surfaceIds.clear();
     lockedSurfaceIds.clear();
-    assistantMessages.clear();
     hasStarted.value = false;
     isLoading.value = false;
     shouldHideMainInput.value = false;
@@ -300,6 +351,7 @@ EXAMPLE SHAPE:
     errorMessage.value = null;
     _history.clear();
     _surfaceHasInteractiveInput.clear();
+    _surfaceRevision = 0;
     _disposeGenUI();
     _initGenUI();
   }
@@ -324,8 +376,8 @@ EXAMPLE SHAPE:
 The user interacted with the generated UI. Continue the intake using this A2UI action/event payload:
 ${const JsonEncoder.withIndent('  ').convert(message.toJson())}
 
-If one more focused question is clinically necessary, respond with a new A2UI v0.9 surface.
-If you now have enough context, stop generating UI and provide a friendly final structured response with the recommended urgency, service, and next steps. Do not ask for more input in that final response.
+If more context is clinically necessary, respond with a new A2UI v0.9 surface asking 2 or 3 focused questions at most.
+If you now have enough context, respond with a final non-interactive A2UI v0.9 CareSummary surface with the recommended urgency, service, and next steps. Do not ask for more input in that final response.
 ''';
   }
 

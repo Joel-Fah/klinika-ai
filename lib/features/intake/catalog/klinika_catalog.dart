@@ -1,5 +1,6 @@
 import 'package:genui/genui.dart';
 
+import 'widgets/care_summary.dart';
 import 'widgets/clinical_text_input.dart';
 import 'widgets/department_selector.dart';
 import 'widgets/duration_selector.dart';
@@ -13,6 +14,7 @@ Catalog buildKlinikaCatalog() {
     buildTriageBannerItem(),
     buildDepartmentSelectorItem(),
     buildSymptomChipGroupItem(),
+    buildCareSummaryItem(),
     buildClinicalTextInputItem(),
     buildPainScaleItem(),
     buildDurationSelectorItem(),

@@ -33,7 +33,7 @@ chips, and clinically relevant follow-up fields.
   answer
 - Read-only generated surfaces after submission to avoid accidental duplicate
   sends
-- Plain structured assistant responses when no more generated UI is needed
+- Non-interactive GenUI care summaries when no more input is needed
 - A multilingual animated empty state with typewriter-style guidance
 - Gemini streaming responses through `firebase_ai`
 - GenUI dynamic surfaces rendered with `SurfaceController`, `Conversation`,
@@ -42,6 +42,7 @@ chips, and clinically relevant follow-up fields.
   - `TriageBanner`
   - `DepartmentSelector`
   - `SymptomChipGroup`
+  - `CareSummary`
   - `ClinicalTextInput`
   - `PainScale`
   - `DurationSelector`
@@ -84,6 +85,7 @@ lib/
       catalog/
         klinika_catalog.dart
         widgets/
+          care_summary.dart
           clinical_text_input.dart
           department_selector.dart
           duration_selector.dart
@@ -126,8 +128,8 @@ assets/
 9. The transport parses those chunks into surface updates.
 10. `SessionView` renders each generated surface with GenUI `Surface`.
 11. If a generated UI submits an answer, that surface is locked read-only.
-12. If Gemini returns a final structured text response instead of A2UI, the app
-    renders it as an assistant message card.
+12. When Gemini has enough context, it returns a non-interactive GenUI
+    `CareSummary` instead of asking another question.
 
 Gemini is initialized lazily when the first message is sent. This keeps the
 welcome screen and widget tests from requiring a live Firebase app before the
@@ -180,6 +182,36 @@ Expected data:
 {
   "label": "Symptomes associes",
   "chips": ["Fievre", "Maux de tete", "Fatigue"]
+}
+```
+
+### `CareSummary`
+
+Shows the final non-interactive handoff surface with clear priority,
+recommended service, organized summary blocks, next steps, warnings, and a
+short safety disclaimer. This replaces raw Markdown for final responses.
+
+Expected data:
+
+```json
+{
+  "severity": "moderate",
+  "title": "Resume de triage",
+  "subtitle": "Les symptomes meritent une consultation sans attendre trop longtemps.",
+  "department": "Medecine generale",
+  "sections": [
+    {
+      "heading": "Ce que j ai compris",
+      "body": "Fievre depuis 3 jours avec maux de tete.",
+      "kind": "summary"
+    },
+    {
+      "heading": "Prochaine etape",
+      "body": "Faire verifier les constantes et discuter du traitement avec un soignant.",
+      "kind": "nextSteps"
+    }
+  ],
+  "disclaimer": "Cette fiche aide au triage et ne remplace pas un diagnostic medical."
 }
 ```
 
@@ -389,7 +421,9 @@ Expected behavior:
 - moderate or urgent triage banner
 - general medicine department
 - related symptom chips
-- follow-up fields for duration and intensity
+- follow-up fields for duration and intensity, grouped as 2-3 focused
+  questions when more context is needed
+- final `CareSummary` when enough information has been collected
 
 ### 2. Child Rash, Camfranglais
 
@@ -403,6 +437,7 @@ Expected behavior:
 - pediatrics department
 - age-related follow-up field
 - related rash and fever chips
+- final pediatric `CareSummary` with next steps
 
 ### 3. Chest Pain, Urgent
 
@@ -416,6 +451,7 @@ Expected behavior:
 - emergency department
 - minimal critical follow-up fields
 - no long static intake form
+- final urgent `CareSummary` if the urgent picture is already clear
 
 The point of the demo: same app, same code, different UI each time.
 
@@ -465,6 +501,15 @@ I feel dizzy with headache and blurred vision.
 
 Expected UI: `ChoicePicker` for associated symptoms and warning signs.
 
+### Final Care Summary
+
+```text
+J'ai eu de la fievre pendant 3 jours, mal a la tete, pas de douleur thoracique, et je bois encore normalement.
+```
+
+Expected UI: non-interactive `CareSummary` with priority, recommended service,
+summary blocks, next steps, and disclaimer.
+
 ## Troubleshooting
 
 ### The app opens but Gemini does not respond
@@ -507,9 +552,9 @@ ios/Runner/GoogleService-Info.plist
 
 ### Generated UI is blank
 
-Gemini must produce valid A2UI messages. The system prompt requires at least one
-surface per response. Check debug logs for GenUI parsing or missing `root`
-component warnings.
+Gemini must produce valid A2UI messages for interactive forms and final
+summaries. Check debug logs for GenUI parsing, missing `version: "v0.9"`, or
+missing `root` component warnings.
 
 ### The same form appears repeatedly
 
